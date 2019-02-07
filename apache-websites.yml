@@ -1,0 +1,73 @@
+---
+- name: Installing Apache Web Server and Adding Virtual Host
+  hosts: target
+  become: true
+  tasks:
+    - name: Installing Apache Web Server
+      yum:
+        name: httpd
+        state: latest
+
+    - name: Start the Apache Service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Configure to listen on Port 8080
+      lineinfile:
+        path: '/etc/httpd/conf/httpd.conf'
+        regexp: '^Listen '
+        insertafter: '^#Listen '
+        line: 'Listen 8080'
+
+    - name: Copy the sites file
+      copy:
+        src: 'kzn.net'
+        dest: '/var/www/'
+
+    - name: Copy the configuration file
+      copy:
+        src: 'sites-available'
+        dest: '/etc/httpd/'
+
+    - name: Creating the sites-enabled directory
+      file:
+        path: '/etc/httpd/sites-enabled'
+        state: directory
+        mode: 0755
+
+    - name: Add the symbolic link
+      file:
+        src: /etc/httpd/sites-available/kzn.net.conf
+        dest: /etc/httpd/sites-enabled/kzn.net.conf
+        state: link
+
+    - name: Modify the httpd.conf to include sites-enabled
+      lineinfile:
+        dest: /etc/httpd/conf/httpd.conf
+        regexp: '^IncludeOptional '
+        line: 'IncludeOptional sites-enabled/*.conf'
+      notify: Restart Apache
+
+    - name: Update the /etc/hosts to allow and use the server name
+      lineinfile:
+        dest: /etc/hosts
+        line: '127.0.0.1 kzn.net'
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+
+
+- name: Updating the Control Node /etc/hosts file
+  hosts: control
+  become: true
+  tasks:
+    - name: Modify the /etc/hosts file
+      lineinfile:
+        dest: '/etc/hosts'
+        line: '192.168.100.101 kzn.net'
+
